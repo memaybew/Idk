@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Warsaw H-Engine v5.0: The Colossus Update</title>
+    <style>
+        /* ============================================================
+           SYSTEM CSS - ĐỒ SỘ & CHI TIẾT
+           ============================================================ */
+        :root {
+            --p-color: #ff4757;
+            --p-glow: rgba(255, 71, 87, 0.6);
+            --s-color: #70a1ff;
+            --s-glow: rgba(112, 161, 255, 0.4);
+            --g-color: #ffa502;
+            --bg-darker: #020203;
+            --bg-panel: rgba(5, 5, 8, 0.98);
+            --border-ui: #2f3542;
+            --text-main: #ced4da;
+            --text-dim: #a4b0be;
+            --font-header: 'Segoe UI', Impact, sans-serif;
+            --font-mono: 'Consolas', 'Courier New', monospace;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100vw; height: 100dvh;
+            background-color: #000;
+            color: #fff;
+            font-family: var(--font-header);
+            overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        #master-container {
+            position: relative;
+            width: 98vw; height: 95dvh;
+            max-width: 1600px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-ui);
+            display: flex; flex-direction: row;
+            box-shadow: 0 0 100px rgba(0,0,0,1);
+        }
+
+        /* --- SIDEBAR LEFT --- */
+        #sidebar-left {
+            width: 320px; height: 100%;
+            background: var(--bg-panel);
+            border-right: 2px solid var(--border-ui);
+            display: flex; flex-direction: column;
+            padding: 25px; box-sizing: border-box;
+            z-index: 100;
+        }
+
+        .profile-section {
+            text-align: center;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #222;
+        }
+
+        .avatar-container {
+            width: 80px; height: 80px;
+            margin: 0 auto 15px;
+            border: 2px solid var(--p-color);
+            position: relative;
+            background: #111;
+        }
+
+        .avatar-scanline {
+            position: absolute; width: 100%; height: 2px;
+            background: var(--p-color);
+            top: 0; animation: scan 3s linear infinite;
+        }
+
+        /* --- STATUS BARS --- */
+        .status-group { margin-top: 30px; }
+        .stat-bar-container { margin-bottom: 20px; }
+        .stat-label { 
+            display: flex; justify-content: space-between; 
+            font-size: 11px; color: var(--text-dim);
+            margin-bottom: 6px; letter-spacing: 1px;
+        }
+        .bar-outer { 
+            width: 100%; height: 12px; 
+            background: #000; border: 1px solid #333; 
+            border-radius: 6px; overflow: hidden;
+        }
+        .bar-inner { height: 100%; width: 0%; transition: width 0.8s ease; }
+
+        /* --- SKILL TREE UI --- */
+        #skill-panel {
+            margin-top: 20px;
+            flex-grow: 1;
+            font-family: var(--font-mono);
+        }
+        .skill-node {
+            font-size: 10px; color: #555;
+            padding: 5px; border: 1px solid #222;
+            margin-bottom: 5px;
+        }
+        .skill-node.active { color: var(--g-color); border-color: var(--g-color); }
+
+        /* --- MAIN VIEWPORT --- */
+        #main-viewport {
+            flex-grow: 1;
+            position: relative;
+            display: flex; flex-direction: column;
+            background: #000;
+        }
+
+        #render-canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 1;
+        }
+
+        /* --- DIALOGUE & ACTION OVERLAY --- */
+        #ui-overlay {
+            position: relative; z-index: 50;
+            margin-top: auto;
+            padding: 30px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.95) 20%);
+        }
+
+        #dialogue-box {
+            background: rgba(10, 10, 15, 0.9);
+            border: 1px solid var(--border-ui);
+            padding: 30px;
+            min-height: 220px;
+            box-shadow: 0 -10px 50px rgba(0,0,0,0.5);
+        }
+
+        #speaker-name {
+            color: var(--p-color);
+            font-size: 14px; font-weight: bold;
+            margin-bottom: 10px; text-transform: uppercase;
+        }
+
+        #message-text {
+            font-size: 19px; line-height: 1.7;
+            color: var(--text-main); height: 100px;
+            overflow-y: auto; margin-bottom: 25px;
+        }
+
+        .choice-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px;
+        }
+
+        .btn-action {
+            background: #111; border: 1px solid #444;
+            color: #fff; padding: 18px;
+            font-size: 13px; text-align: left;
+            cursor: pointer; transition: 0.3s;
+            position: relative; overflow: hidden;
+        }
+
+        .btn-action:hover {
+            border-color: var(--p-color);
+            background: rgba(255, 71, 87, 0.1);
+            transform: translateX(10px);
+        }
+
+        /* --- LOG NOTIFICATIONS --- */
+        #log-stream {
+            position: absolute; right: 20px; top: 20px;
+            width: 250px; z-index: 200;
+        }
+        .log-item {
+            background: rgba(0,0,0,0.8);
+            border-right: 3px solid var(--g-color);
+            padding: 10px; margin-bottom: 5px;
+            font-size: 11px; animation: slideIn 0.4s ease;
+        }
+
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        
+        .shake { animation: shakeEffect 0.5s; }
+        @keyframes shakeEffect {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            50% { transform: translate(-1px, 2px) rotate(1deg); }
+            100% { transform: translate(1px, 1px) rotate(0deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="master-container">
+    <aside id="sidebar-left">
+        <div class="profile-section">
+            <div class="avatar-container"><div class="avatar-scanline"></div></div>
+            <div style="font-size: 16px; letter-spacing: 2px;">WARSAW_ELITE</div>
+            <div id="rank-tag" style="color: var(--g-color); font-size: 10px;">PROTOTYPE v5.0</div>
+        </div>
+
+        <div class="status-group">
+            <div class="stat-bar-container">
+                <div class="stat-label"><span>VỎ SINH HỌC (HP)</span><span id="hp-txt">100/100</span></div>
+                <div class="bar-outer"><div id="hp-bar" class="bar-inner" style="background: var(--s-color); width: 100%;"></div></div>
+            </div>
+            <div class="stat-bar-container">
+                <div class="stat-label"><span>XUNG KÍCH THÍCH (LUST)</span><span id="lust-txt">0%</span></div>
+                <div class="bar-outer"><div id="lust-bar" class="bar-inner" style="background: var(--p-color);"></div></div>
+            </div>
+            <div class="stat-bar-container">
+                <div class="stat-label"><span>DATA OVERLOAD (EXP)</span><span id="exp-txt">0/1000</span></div>
+                <div class="bar-outer"><div id="exp-bar" class="bar-inner" style="background: var(--g-color);"></div></div>
+            </div>
+        </div>
+
+        <div id="skill-panel">
+            <div style="font-size: 11px; margin-bottom: 10px; color: #444;">SKILL TREE STATUS:</div>
+            <div class="skill-node" id="sk-1">NEURAL_HACK_V1</div>
+            <div class="skill-node" id="sk-2">PHEROMONE_EMITTER</div>
+            <div class="skill-node" id="sk-3">STRENGTH_BOOST</div>
+            <div class="skill-node" id="sk-4">SENSORY_EXPANSION</div>
+        </div>
+
+        <div id="inv-panel" style="margin-top: 20px; font-size: 11px;">
+            <div style="color: #444;">INVENTORY:</div>
+            <div id="inv-list" style="color: var(--s-color); margin-top: 5px;">[EMPTY]</div>
+        </div>
+    </aside>
+
+    <main id="main-viewport">
+        <canvas id="render-canvas"></canvas>
+        <div id="log-stream"></div>
+
+        <div id="ui-overlay">
+            <div id="dialogue-box">
+                <div id="speaker-name">SYSTEM_INIT</div>
+                <div id="message-text">Nạp dữ liệu thực tế ảo... Chờ trong giây lát...</div>
+                <div id="choice-container" class="choice-grid"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+/* ============================================================
+   WARSAW MEGA ENGINE - JAVASCRIPT ĐỒ SỘ
+   ============================================================ */
+
+const canvas = document.getElementById('render-canvas');
+const ctx = canvas.getContext('2d');
+let w, h;
+
+// --- STATE MANAGEMENT ---
+const GAME = {
+    player: {
+        hp: 100,
+        lust: 0,
+        exp: 0,
+        lv: 1,
+        items: [],
+        skills: { hack: 0, charm: 0, power: 0 },
+        flags: new Set()
+    },
+    engine: {
+        isTyping: false,
+        frame: 0,
+        particles: [],
+        currentScene: 'start_sequence'
+    }
+};
+
+// --- DATA DATABASE (Kịch bản cực lớn) ---
+const DATABASE = {
+    start_sequence: {
+        speaker: "CORE_AI",
+        text: "Hệ thống thần kinh trung ương đã được đồng bộ. Bạn đang ở trong kén sinh trưởng tại tầng hầm District 9. Mùi hóa chất nồng nặc và tiếng máy móc gầm rú xung quanh.",
+        choices: [
+            { t: "Mở kén và bước ra ngoài", n: "basement_exit", f: () => addLog("System: Physical movement detected.") },
+            { t: "Truy cập mạng lưới ngầm", n: "neural_net", f: () => { GAME.player.skills.hack += 1; unlockSkill('sk-1'); } }
+        ]
+    },
+    basement_exit: {
+        speaker: "DISTRICT 9",
+        text: "Bạn bước ra ngoài. Ánh đèn neon tím từ những tòa cao ốc phía xa rọi qua khe hở của tầng hầm. Một nữ người máy cai quản đang nhìn chằm chằm vào bạn.",
+        choices: [
+            { t: "Thương lượng bằng Pheromone", n: "guard_charm", f: () => { GAME.player.lust += 10; } },
+            { t: "Tấn công bất ngờ", n: "combat_init", f: () => { triggerShake(); } },
+            { t: "Lẻn qua bóng tối", n: "alleyway", f: () => addExp(50) }
+        ]
+    },
+    neural_net: {
+        speaker: "CYBERSPACE",
+        text: "Ý thức của bạn trôi dạt trong dòng dữ liệu. Bạn nhìn thấy bản đồ của toàn thành phố và các tập tin tuyệt mật về dự án 'Warsaw Prototype'.",
+        choices: [
+            { t: "Tải dữ liệu nâng cấp (EXP+)", n: "start_sequence", f: () => addExp(200) },
+            { t: "Ngắt kết nối khẩn cấp", n: "basement_exit", f: () => {} }
+        ]
+    },
+    guard_charm: {
+        speaker: "UNIT_771 (WARDEN)",
+        text: "Ả quét qua cơ thể bạn. 'Mã gen của ngươi... thật kỳ lạ. Nó khiến hệ thống của ta nóng lên.' Ả tiến lại gần, tay chạm vào lớp vỏ của bạn.",
+        choices: [
+            { t: "Để ả kiểm tra (Lust++)", n: "interaction_deep", f: () => { GAME.player.lust += 30; } },
+            { t: "Đẩy ả ra", n: "basement_exit", f: () => { GAME.player.hp -= 5; } }
+        ]
+    },
+    combat_init: {
+        speaker: "BATTLE_MODE",
+        text: "Cảnh báo! Bạn đang trong trạng thái chiến đấu. Năng lượng sinh học đang tập trung vào nắm đấm. Đối thủ đang phòng thủ.",
+        choices: [
+            { t: "Đấm trực diện (HP-)", n: "basement_exit", f: () => { GAME.player.hp -= 20; addExp(100); } },
+            { t: "Tìm kẽ hở", n: "basement_exit", f: () => { addExp(150); } }
+        ]
+    },
+    interaction_deep: {
+        speaker: "CẢNH BÁO KÍCH THÍCH",
+        text: "Sự tiếp xúc vật lý đang đẩy chỉ số Lust lên mức nguy hiểm. Hệ thống làm mát đã hỏng. Bạn cảm thấy một sự khoái cảm điện từ chạy khắp các mạch máu.",
+        choices: [
+            { t: "Tiếp nhận toàn bộ", n: "peak_climax", f: () => { GAME.player.lust = 100; } },
+            { t: "Chống lại ý muốn", n: "basement_exit", f: () => { GAME.player.hp -= 10; } }
+        ]
+    },
+    peak_climax: {
+        speaker: "SYSTEM_OVERLOAD",
+        text: "GIỚI HẠN ĐÃ VƯỢT QUA. Dữ liệu thực tế ảo bị lỗi... Bạn đã đồng hóa hoàn toàn với Unit 771. Ký ức của bạn bị xóa sạch.",
+        choices: [
+            { t: "TÁI KHỞI ĐỘNG (RESET)", n: "start_sequence", f: () => resetGame() }
+        ]
+    }
+};
+
+// --- RENDER ENGINE (Code đồ họa tốn dòng) ---
+function initCanvas() {
+    w = canvas.width = canvas.offsetWidth;
+    h = canvas.height = canvas.offsetHeight;
+}
+
+class Particle {
+    constructor() { this.reset(); }
+    reset() {
+        this.x = Math.random() * w;
+        this.y = Math.random() * h;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = (Math.random() - 0.5) * 2;
+        this.s = Math.random() * 3;
+        this.c = Math.random() > 0.5 ? '#ff4757' : '#70a1ff';
+        this.l = 1;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        this.l -= 0.005; if(this.l <= 0) this.reset();
+    }
+    draw() {
+        ctx.globalAlpha = this.l;
+        ctx.fillStyle = this.c;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.s, 0, Math.PI*2); ctx.fill();
+    }
+}
+
+function render() {
+    GAME.engine.frame++;
+    ctx.fillStyle = '#050508'; ctx.fillRect(0, 0, w, h);
+    
+    // Grid động
+    ctx.strokeStyle = 'rgba(112, 161, 255, 0.03)';
+    for(let i=0; i<w; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke(); }
+    for(let j=0; j<h; j+=40) { ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(w, j); ctx.stroke(); }
+
+    // Xử lý hạt
+    if(GAME.engine.particles.length < 100) GAME.engine.particles.push(new Particle());
+    GAME.engine.particles.forEach(p => { p.update(); p.draw(); });
+
+    // Hiệu ứng hưng phấn đỏ
+    if(GAME.player.lust > 50) {
+        let op = (GAME.player.lust - 50) / 200;
+        ctx.fillStyle = `rgba(255, 71, 87, ${op * Math.abs(Math.sin(GAME.engine.frame/20))})`;
+        ctx.fillRect(0,0,w,h);
+    }
+
+    requestAnimationFrame(render);
+}
+
+// --- LOGIC FUNCTIONS (Code xử lý nhiều công đoạn) ---
+function loadScene(key) {
+    const scene = DATABASE[key];
+    if(!scene) return;
+    
+    GAME.engine.isTyping = true;
+    document.getElementById('speaker-name').innerText = `:: ${scene.speaker} ::`;
+    
+    const textEl = document.getElementById('message-text');
+    textEl.innerHTML = "";
+    let i = 0;
+    const timer = setInterval(() => {
+        textEl.innerHTML += scene.text[i];
+        i++;
+        if(i >= scene.text.length) {
+            clearInterval(timer);
+            GAME.engine.isTyping = false;
+            renderChoices(scene.choices);
+        }
+    }, 20);
+    beep(150, 0.05);
+}
+
+function renderChoices(choices) {
+    const container = document.getElementById('choice-container');
+    container.innerHTML = "";
+    choices.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = "btn-action";
+        btn.innerHTML = `<span>▶</span> ${c.t}`;
+        btn.onclick = () => {
+            if(GAME.engine.isTyping) return;
+            c.f();
+            updateUI();
+            loadScene(c.n);
+            beep(400, 0.1);
+        };
+        container.appendChild(btn);
+    });
+}
+
+function updateUI() {
+    document.getElementById('hp-bar').style.width = GAME.player.hp + "%";
+    document.getElementById('hp-txt').innerText = `${GAME.player.hp}/100`;
+    
+    document.getElementById('lust-bar').style.width = GAME.player.lust + "%";
+    document.getElementById('lust-txt').innerText = `${GAME.player.lust}%`;
+    
+    document.getElementById('exp-bar').style.width = (GAME.player.exp % 100) + "%";
+    document.getElementById('exp-txt').innerText = `${GAME.player.exp}/1000`;
+
+    if(GAME.player.hp <= 0) { alert("DEAD_LOOP_RESTART"); resetGame(); }
+}
+
+function addExp(v) {
+    GAME.player.exp += v;
+    addLog(`+${v} DATA_FRAGS`);
+    if(GAME.player.exp >= GAME.player.lv * 1000) {
+        GAME.player.lv++;
+        addLog("SYSTEM_RANK_UP!");
+        beep(800, 0.3);
+    }
+}
+
+function addLog(m) {
+    const stream = document.getElementById('log-stream');
+    const div = document.createElement('div');
+    div.className = 'log-item';
+    div.innerText = `[LOG]: ${m}`;
+    stream.prepend(div);
+    setTimeout(() => div.remove(), 4000);
+}
+
+function unlockSkill(id) {
+    document.getElementById(id).classList.add('active');
+    addLog(`UNLOCKED: ${document.getElementById(id).innerText}`);
+}
+
+function triggerShake() {
+    const main = document.getElementById('master-container');
+    main.classList.add('shake');
+    setTimeout(() => main.classList.remove('shake'), 500);
+}
+
+function beep(f, d) {
+    try {
+        const a = new (window.AudioContext || window.webkitAudioContext)();
+        const o = a.createOscillator(); const g = a.createGain();
+        o.connect(g); g.connect(a.destination);
+        o.frequency.value = f; g.gain.value = 0.05;
+        o.start(); setTimeout(() => o.stop(), d*1000);
+    } catch(e) {}
+}
+
+function resetGame() {
+    GAME.player = { hp: 100, lust: 0, exp: 0, lv: 1, items: [], skills: { hack: 0, charm: 0, power: 0 }, flags: new Set() };
+    document.querySelectorAll('.skill-node').forEach(n => n.classList.remove('active'));
+    updateUI();
+    loadScene('start_sequence');
+}
+
+// --- BOOT ---
+window.addEventListener('resize', initCanvas);
+initCanvas();
+updateUI();
+loadScene('start_sequence');
+render();
+
+</script>
+</body>
+</html>
